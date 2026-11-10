@@ -9,10 +9,13 @@ export default function Home() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   
-  // Password Setup States
+  // Auth States
   const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
@@ -20,21 +23,18 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   
-  // Modal for Image Viewing
   const [selectedImg, setSelectedImg] = useState<string | null>(null);
 
   const [devices, setDevices] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   
-  // Modals
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   
-  // Group Edit States
   const [isEditGroupModalOpen, setIsEditGroupModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [editGroupName, setEditGroupName] = useState('');
@@ -42,7 +42,6 @@ export default function Home() {
   
   const [selectedDevice, setSelectedDevice] = useState<any>(null);
   
-  // Form States
   const [newDeviceName, setNewDeviceName] = useState('');
   const [newDeviceIp, setNewDeviceIp] = useState('');
   
@@ -51,21 +50,21 @@ export default function Home() {
   const [editInterval, setEditInterval] = useState(4);
   const [editBreakStart, setEditBreakStart] = useState('');
   const [editBreakEnd, setEditBreakEnd] = useState('');
-  const [editGroupIds, setEditGroupIds] = useState<string[]>([]); // Multi-group State
+  const [editGroupIds, setEditGroupIds] = useState<string[]>([]);
   
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupChatId, setNewGroupChatId] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('admin'); 
 
-  // Image Upload States
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && (hash.includes('type=invite') || hash.includes('type=recovery'))) {
+    // 🌟 ইনভাইট বা রিকভারি লিংক ঠিকমতো ধরার জন্য আপডেট করা হয়েছে
+    const url = window.location.href;
+    if (url.includes('type=invite') || url.includes('type=recovery')) {
       setIsSettingPassword(true);
     }
 
@@ -119,6 +118,7 @@ export default function Home() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setErrorMsg(error.message);
     else {
@@ -127,6 +127,22 @@ export default function Home() {
       fetchData();
       fetchUserRole(data.session?.user.id as string);
       setProfileImage(data.session?.user.user_metadata?.avatar_url || null);
+    }
+  };
+
+  // 🌟 নতুন ফাংশন: পাসওয়ার্ড রিসেট লিংক পাঠানো
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: window.location.origin, // রিসেট করার পর এই ওয়েবসাইটে ফিরে আসবে
+    });
+
+    if (error) setErrorMsg(error.message);
+    else {
+      setSuccessMsg("Password reset link sent to your email!");
+      setTimeout(() => setIsForgotPassword(false), 3000);
     }
   };
 
@@ -187,7 +203,6 @@ export default function Home() {
     }
   };
 
-  // 🌟 আপডেট করা ডিলিট ফাংশন (সার্ভার API কল করবে)
   const handleDeleteMember = async (memberId: string) => {
     if (userRole !== 'super_admin') return alert("Only Super Admin can delete members.");
     
@@ -383,13 +398,13 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] relative overflow-hidden">
         <div className="w-full max-w-md p-8 bg-[#111111] rounded-2xl border border-gray-800 shadow-2xl relative z-10">
           <h1 className="text-3xl font-bold tracking-wider text-white text-center mb-2">Texan<span className="text-[#F7D117]">.</span></h1>
-          <p className="text-center text-gray-400 mb-6 text-sm">Set your password to continue.</p>
+          <p className="text-center text-gray-400 mb-6 text-sm">Set your new password to continue.</p>
           <form className="space-y-4" onSubmit={handleSetPassword}>
             <div>
               <label className="block text-sm text-gray-400 mb-1">New Password</label>
               <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required minLength={6} />
             </div>
-            <button type="submit" className="w-full py-3 bg-[#F7D117] text-black font-bold rounded-lg mt-4">Save Password</button>
+            <button type="submit" className="w-full py-3 bg-[#F7D117] text-black font-bold rounded-lg mt-4">Save Password & Login</button>
           </form>
         </div>
       </div>
@@ -401,18 +416,39 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] relative overflow-hidden">
         <div className="w-full max-w-md p-8 bg-[#111111] rounded-2xl border border-gray-800 shadow-2xl relative z-10">
           <h1 className="text-3xl font-bold tracking-wider text-white text-center mb-8">Texan<span className="text-[#F7D117]">.</span></h1>
+          
           {errorMsg && <div className="mb-4 p-3 bg-red-500/10 text-red-400 text-sm rounded-lg text-center">{errorMsg}</div>}
-          <form className="space-y-4" onSubmit={handleLogin}>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required />
-            </div>
-            <button type="submit" className="w-full py-3 bg-[#F7D117] text-black font-bold rounded-lg mt-4">Sign In</button>
-          </form>
+          {successMsg && <div className="mb-4 p-3 bg-green-500/10 text-green-400 text-sm rounded-lg text-center">{successMsg}</div>}
+
+          {/* Forgot Password Form */}
+          {isForgotPassword ? (
+            <form className="space-y-4" onSubmit={handleForgotPassword}>
+              <p className="text-sm text-gray-400 text-center mb-4">Enter your email to receive a password reset link.</p>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Email</label>
+                <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required />
+              </div>
+              <button type="submit" className="w-full py-3 bg-[#F7D117] text-black font-bold rounded-lg mt-4">Send Reset Link</button>
+              <p className="text-center mt-4">
+                <button type="button" onClick={() => setIsForgotPassword(false)} className="text-sm text-gray-400 hover:text-white">Back to Login</button>
+              </p>
+            </form>
+          ) : (
+            <form className="space-y-4" onSubmit={handleLogin}>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Password</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required />
+              </div>
+              <button type="submit" className="w-full py-3 bg-[#F7D117] text-black font-bold rounded-lg mt-4">Sign In</button>
+              <p className="text-center mt-4">
+                <button type="button" onClick={() => setIsForgotPassword(true)} className="text-sm text-gray-400 hover:text-white hover:underline">Forgot Password?</button>
+              </p>
+            </form>
+          )}
         </div>
       </div>
     );
