@@ -109,15 +109,25 @@ export default function Home() {
     return () => { authListener.subscription.unsubscribe(); };
   }, []);
 
+  // 🌟 ফিক্স: প্রতিবার ২০ সেকেন্ডে ডেটা রিফ্রেশের সাথে ইউজার ভেরিফাই করবে
   useEffect(() => {
     if (!session) return;
-    const interval = setInterval(() => { fetchData(); }, 20000); 
+    const interval = setInterval(() => { 
+      fetchData(); 
+      fetchUserRole(session.user.id); 
+    }, 20000); 
     return () => clearInterval(interval);
   }, [session]);
 
+  // 🌟 ফিক্স: ইউজার ডিলিট হয়ে গেলে অটোমেটিক লগআউট হবে
   const fetchUserRole = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('role').eq('id', userId).single();
-    if (data) setUserRole(data.role);
+    const { data, error } = await supabase.from('profiles').select('role').eq('id', userId).single();
+    if (data) {
+      setUserRole(data.role);
+    } else if (error && error.code === 'PGRST116') {
+      // PGRST116 মানে ডেটা খুঁজে পাওয়া যায়নি (ডিলিট হয়ে গেছে)
+      await handleLogout();
+    }
   };
 
   const fetchData = async () => {
@@ -171,7 +181,6 @@ export default function Home() {
     }
   };
 
-  // 🌟 নতুন আপডেট: কারেন্ট পাসওয়ার্ড ভেরিফিকেশন সহ পাসওয়ার্ড চেঞ্জ
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPassMsg('');
@@ -183,7 +192,6 @@ export default function Home() {
       return setPassMsg("New password must be at least 6 characters.");
     }
 
-    // ১. কারেন্ট পাসওয়ার্ড ভেরিফাই করা (লগইন চেক)
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: session.user.email,
       password: currentPass
@@ -193,7 +201,6 @@ export default function Home() {
       return setPassMsg("Incorrect current password.");
     }
 
-    // ২. নতুন পাসওয়ার্ড সেভ করা
     const { error: updateError } = await supabase.auth.updateUser({ password: newPass });
     
     if (updateError) {
@@ -914,14 +921,13 @@ export default function Home() {
         </div>
       </main>
 
-      {/* 🌟 Profile Modal with Password Change & Image Panning */}
+      {/* Modals */}
       {isProfileModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#111111] border border-gray-800 p-6 rounded-2xl w-full max-w-md relative my-8 max-h-[90vh] overflow-y-auto">
             <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-[#F7D117] transition-colors">✕</button>
             <h3 className="text-xl font-bold mb-6 text-center text-white">Account Settings</h3>
             
-            {/* 1. Profile Image Section */}
             <div className="flex flex-col items-center mb-8">
               <div 
                 className="w-32 h-32 bg-gray-800 rounded-full mb-4 border-2 border-gray-600 overflow-hidden cursor-move flex items-center justify-center relative group"
@@ -959,7 +965,6 @@ export default function Home() {
 
             <hr className="border-gray-800 mb-8" />
 
-            {/* 2. Change Password Section */}
             <div>
               <h4 className="text-lg font-semibold text-white mb-4">Change Password</h4>
               {passMsg && <div className={`p-3 mb-4 text-sm rounded-lg ${passMsg.includes('success') ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{passMsg}</div>}
