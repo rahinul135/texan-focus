@@ -33,6 +33,7 @@ export default function Home() {
   const [groups, setGroups] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   
+  // Modals
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
@@ -62,13 +63,22 @@ export default function Home() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('admin'); 
 
+  // Profile & Image States
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [imgPosition, setImgPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Password Change States
+  const [currentPass, setCurrentPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [passMsg, setPassMsg] = useState('');
 
   useEffect(() => {
     const url = window.location.href;
-    // 🌟 নতুন ফিক্স: ইউআরএল-এ invite=true বা type=invite/recovery থাকলে পাসওয়ার্ড স্ক্রিন দেখাবে
     if (url.includes('invite=true') || url.includes('type=invite') || url.includes('type=recovery')) {
       setIsSettingPassword(true);
     }
@@ -157,8 +167,42 @@ export default function Home() {
     else {
       alert("Password set successfully! Welcome to Texan.");
       setIsSettingPassword(false);
-      // URL থেকে invite=true বা type=recovery সরিয়ে ফেলা
       window.history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  // 🌟 নতুন আপডেট: কারেন্ট পাসওয়ার্ড ভেরিফিকেশন সহ পাসওয়ার্ড চেঞ্জ
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassMsg('');
+    
+    if (newPass !== confirmPass) {
+      return setPassMsg("New passwords do not match!");
+    }
+    if (newPass.length < 6) {
+      return setPassMsg("New password must be at least 6 characters.");
+    }
+
+    // ১. কারেন্ট পাসওয়ার্ড ভেরিফাই করা (লগইন চেক)
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: session.user.email,
+      password: currentPass
+    });
+
+    if (signInError) {
+      return setPassMsg("Incorrect current password.");
+    }
+
+    // ২. নতুন পাসওয়ার্ড সেভ করা
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPass });
+    
+    if (updateError) {
+      setPassMsg(updateError.message);
+    } else {
+      setPassMsg("Password updated successfully!");
+      setCurrentPass('');
+      setNewPass('');
+      setConfirmPass('');
     }
   };
 
@@ -171,10 +215,27 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setProfileImage(reader.result as string);
+      reader.onloadend = () => {
+        setProfileImage(reader.result as string);
+        setImgPosition({ x: 0, y: 0 });
+        setZoomLevel(1);
+      };
       reader.readAsDataURL(file);
     }
   };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - imgPosition.x, y: e.clientY - imgPosition.y });
+  };
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setImgPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  };
+  const handleMouseUp = () => setIsDragging(false);
 
   const saveProfileImage = async () => {
     if (!profileImage || !profileImage.startsWith('data:image')) return;
@@ -246,7 +307,6 @@ export default function Home() {
             role: finalRole,
             invited_by: session.user.id
           }, 
-          // 🌟 নতুন ফিক্স: ইনভাইট লিংকে ক্লিক করলে invite=true নিয়ে আসবে
           emailRedirectTo: `${window.location.origin}/?invite=true` 
         }
       });
@@ -421,17 +481,12 @@ export default function Home() {
 
   const visibleGroups = groups.filter(g => {
     if (userRole === 'super_admin') return true;
-
     if (!g.created_by) return true;
-
     const creator = members.find(m => m.id === g.created_by);
-    
     if (creator && creator.role === 'super_admin') return false;
-
     if (userRole === 'admin') {
       return g.created_by === session.user.id;
     }
-    
     return true;
   });
 
@@ -439,7 +494,6 @@ export default function Home() {
     <>
       <div className="p-6">
         <h1 className="text-2xl font-bold tracking-wider text-white">Texan<span className="text-[#F7D117]">.</span></h1>
-        <p className="text-xs text-gray-500 mt-1">Role: {userRole || 'Loading...'}</p>
       </div>
       <nav className="flex-1 px-4 space-y-2 mt-4">
         {['dashboard', 'devices', 'telegram', 'members'].map((tab) => {
@@ -453,9 +507,26 @@ export default function Home() {
           );
         })}
       </nav>
+      
       <div className="p-4 border-t border-gray-800">
-        <p className="text-xs text-gray-500 mb-2 truncate">{session?.user?.email}</p>
-        <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 rounded-lg">Logout</button>
+        <div className="flex items-center justify-between bg-[#1a1a1a] p-3 rounded-xl border border-gray-800">
+          <div className="flex items-center space-x-3 overflow-hidden">
+            <button onClick={() => setIsProfileModalOpen(true)} className="w-10 h-10 shrink-0 rounded-full bg-[#F7D117] flex items-center justify-center text-black font-bold overflow-hidden border border-gray-600 hover:scale-105 transition-transform">
+              {profileImage ? (
+                <img src={profileImage} className="w-full h-full object-cover" style={{ transform: `scale(${zoomLevel}) translate(${imgPosition.x}px, ${imgPosition.y}px)` }} />
+              ) : (
+                session?.user?.email?.charAt(0).toUpperCase()
+              )}
+            </button>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white truncate">{session?.user?.email}</p>
+              <p className="text-xs text-[#F7D117] capitalize">{userRole}</p>
+            </div>
+          </div>
+          <button onClick={handleLogout} className="text-gray-500 hover:text-red-500 transition-colors p-2" title="Logout">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+          </button>
+        </div>
       </div>
     </>
   );
@@ -546,7 +617,6 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col w-full min-w-0 h-screen overflow-hidden">
         <header className="h-20 border-b border-gray-800 flex items-center justify-between px-4 md:px-8 bg-[#0a0a0a] shrink-0 gap-3 md:gap-4">
-          
           <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2 text-gray-400 hover:text-white transition-colors shrink-0">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
           </button>
@@ -575,7 +645,7 @@ export default function Home() {
           </div>
           
           <button onClick={() => setIsProfileModalOpen(true)} className="w-10 h-10 shrink-0 rounded-full bg-[#F7D117] flex items-center justify-center text-black font-bold overflow-hidden border border-gray-600">
-            {profileImage ? <img src={profileImage} className="w-full h-full object-cover" style={{ transform: `scale(${zoomLevel})` }} /> : session.user.email?.charAt(0).toUpperCase()}
+            {profileImage ? <img src={profileImage} className="w-full h-full object-cover" style={{ transform: `scale(${zoomLevel}) translate(${imgPosition.x}px, ${imgPosition.y}px)` }} /> : session.user.email?.charAt(0).toUpperCase()}
           </button>
         </header>
 
@@ -844,25 +914,72 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Modals */}
+      {/* 🌟 Profile Modal with Password Change & Image Panning */}
       {isProfileModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-gray-800 p-6 rounded-2xl w-full max-w-sm relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#111111] border border-gray-800 p-6 rounded-2xl w-full max-w-md relative my-8 max-h-[90vh] overflow-y-auto">
             <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-[#F7D117] transition-colors">✕</button>
-            <h3 className="text-xl font-bold mb-6 text-center">Update Profile</h3>
-            <div className="flex flex-col items-center">
-              <div className="w-32 h-32 bg-gray-800 rounded-full mb-6 border-2 border-gray-600 overflow-hidden cursor-pointer flex items-center justify-center relative group" onClick={() => fileInputRef.current?.click()}>
-                {profileImage ? <img src={profileImage} alt="Profile" className="w-full h-full object-cover transition-transform" style={{ transform: `scale(${zoomLevel})` }} /> : <span className="text-xs text-gray-400">Click to Upload</span>}
+            <h3 className="text-xl font-bold mb-6 text-center text-white">Account Settings</h3>
+            
+            {/* 1. Profile Image Section */}
+            <div className="flex flex-col items-center mb-8">
+              <div 
+                className="w-32 h-32 bg-gray-800 rounded-full mb-4 border-2 border-gray-600 overflow-hidden cursor-move flex items-center justify-center relative group"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onClick={() => !isDragging && fileInputRef.current?.click()}
+              >
+                {profileImage ? (
+                  <img 
+                    src={profileImage} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover select-none pointer-events-none" 
+                    style={{ transform: `scale(${zoomLevel}) translate(${imgPosition.x}px, ${imgPosition.y}px)` }} 
+                  />
+                ) : (
+                  <span className="text-xs text-gray-400 pointer-events-none">Click to Upload</span>
+                )}
                 <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
               </div>
+              
               {profileImage && (
-                <div className="w-full mb-6">
-                  <label className="text-xs text-gray-400 mb-2 block">Zoom Adjustment</label>
+                <div className="w-full mb-4">
+                  <label className="text-xs text-gray-400 mb-2 flex justify-between">
+                    <span>Zoom</span>
+                    <span>Drag image to adjust position</span>
+                  </label>
                   <input type="range" min="1" max="3" step="0.1" value={zoomLevel} onChange={(e) => setZoomLevel(parseFloat(e.target.value))} className="w-full accent-[#F7D117]" />
                 </div>
               )}
-              <button onClick={saveProfileImage} className="w-full py-2 bg-[#F7D117] text-black font-bold rounded-lg">Save Image</button>
+              
+              <button onClick={saveProfileImage} className="w-full py-2 bg-[#F7D117] text-black font-bold rounded-lg hover:bg-yellow-500 transition-colors">Save Profile Picture</button>
             </div>
+
+            <hr className="border-gray-800 mb-8" />
+
+            {/* 2. Change Password Section */}
+            <div>
+              <h4 className="text-lg font-semibold text-white mb-4">Change Password</h4>
+              {passMsg && <div className={`p-3 mb-4 text-sm rounded-lg ${passMsg.includes('success') ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>{passMsg}</div>}
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Current Password</label>
+                  <input type="password" value={currentPass} onChange={(e) => setCurrentPass(e.target.value)} className="w-full px-4 py-2 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">New Password</label>
+                  <input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} className="w-full px-4 py-2 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required minLength={6} />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Confirm New Password</label>
+                  <input type="password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} className="w-full px-4 py-2 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required minLength={6} />
+                </div>
+                <button type="submit" className="w-full py-2 bg-[#222] border border-gray-700 text-white font-bold rounded-lg hover:bg-[#333] transition-colors">Update Password</button>
+              </form>
+            </div>
+
           </div>
         </div>
       )}
