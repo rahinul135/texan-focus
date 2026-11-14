@@ -615,7 +615,7 @@ export default function Home() {
 
   const SidebarContent = () => (
     <>
-      <div className="p-6"><h1 className="text-2xl font-bold tracking-wider text-white">Texan<span className="text-[#F7D117]">.</span></h1></div>
+      <div className="p-6"><h1 className="text-2xl font-bold tracking-wider text-white">Te<span className="text-[#F7D117]">x</span>an agency</h1></div>
       <nav className="flex-1 px-4 space-y-2 mt-4">
         {['dashboard', 'devices', 'telegram', 'members', 'blocker', 'audit', 'security'].map((tab) => {
           if (tab === 'members' && userRole !== 'super_admin' && userRole !== 'admin') return null;
@@ -665,7 +665,7 @@ export default function Home() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] relative overflow-hidden p-4">
         <div className="w-full max-w-md p-8 bg-[#111111] rounded-2xl border border-gray-800 shadow-2xl relative z-10">
-          <h1 className="text-3xl font-bold tracking-wider text-white text-center mb-2">Texan<span className="text-[#F7D117]">.</span></h1>
+          <h1 className="text-3xl font-bold tracking-wider text-white text-center mb-2">Te<span className="text-[#F7D117]">x</span>an agency</h1>
           <p className="text-center text-gray-400 mb-6 text-sm">Set your new password to continue.</p>
           <form className="space-y-4" onSubmit={handleSetPassword}>
             <div><label className="block text-sm text-gray-400 mb-1">New Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-3 bg-[#0a0a0a] border border-gray-800 rounded-lg text-white" required minLength={6} /></div>
@@ -680,7 +680,7 @@ export default function Home() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] relative overflow-hidden p-4">
         <div className="w-full max-w-md p-8 bg-[#111111] rounded-2xl border border-gray-800 shadow-2xl relative z-10">
-          <h1 className="text-3xl font-bold tracking-wider text-white text-center mb-8">Texan<span className="text-[#F7D117]">.</span></h1>
+          <h1 className="text-3xl font-bold tracking-wider text-white text-center mb-8">Te<span className="text-[#F7D117]">x</span>an agency</h1>
           {errorMsg && <div className="mb-4 p-3 bg-red-500/10 text-red-400 text-sm rounded-lg text-center">{errorMsg}</div>}
           {successMsg && <div className="mb-4 p-3 bg-green-500/10 text-green-400 text-sm rounded-lg text-center">{successMsg}</div>}
           {isForgotPassword ? (
